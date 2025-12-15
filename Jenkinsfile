@@ -80,6 +80,30 @@ pipeline {
             }
         }
         
+        stage('Build Release APK') {
+            steps {
+                echo '🔨 Building Android Release APK (Standalone)...'
+                sh '''
+                    cd android
+                    chmod +x gradlew
+                    
+                    # Build release APK - this will be a standalone APK
+                    ./gradlew assembleRelease --stacktrace
+                    
+                    RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
+                    
+                    if [ -f "$RELEASE_APK" ]; then
+                        echo "✅ Release APK built successfully!"
+                        echo "APK Location: android/$RELEASE_APK"
+                        echo "APK Size: $(ls -lh $RELEASE_APK | awk '{print $5}')"
+                    else
+                        echo "❌ Release APK not found"
+                        exit 1
+                    fi
+                '''
+            }
+        }
+        
         stage('Build Debug APK') {
             steps {
                 echo '🔨 Building Android Debug APK...'
@@ -87,7 +111,7 @@ pipeline {
                     cd android
                     chmod +x gradlew
                     
-                    # Build directly - Gradle handles incremental builds
+                    # Build debug APK
                     ./gradlew assembleDebug --stacktrace
                     
                     DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
@@ -97,18 +121,19 @@ pipeline {
                         echo "APK Location: android/$DEBUG_APK"
                         echo "APK Size: $(ls -lh $DEBUG_APK | awk '{print $5}')"
                     else
-                        echo "❌ APK not found at expected location"
+                        echo "❌ Debug APK not found"
                         exit 1
                     fi
                 '''
             }
         }
         
-        stage('Archive APK') {
+        stage('Archive APKs') {
             steps {
                 echo '📦 Archiving build artifacts...'
                 
-                archiveArtifacts artifacts: 'android/app/build/outputs/apk/debug/*.apk', 
+                // Archive both debug and release APKs
+                archiveArtifacts artifacts: 'android/app/build/outputs/apk/**/*.apk', 
                                 fingerprint: true
                 
                 sh '''
@@ -116,6 +141,9 @@ pipeline {
                     GIT_COMMIT=$(git rev-parse HEAD)
                     GIT_SHORT=$(git rev-parse --short HEAD)
                     GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+                    
+                    DEBUG_SIZE=$(ls -lh android/app/build/outputs/apk/debug/app-debug.apk | awk '{print $5}')
+                    RELEASE_SIZE=$(ls -lh android/app/build/outputs/apk/release/app-release.apk | awk '{print $5}')
                     
                     cat > build-info.txt << EOF
 ╔════════════════════════════════════════╗
@@ -129,10 +157,19 @@ Git Branch:      ${GIT_BRANCH}
 Jenkins Job:     ${JOB_NAME}
 Build URL:       ${BUILD_URL}
 
-APK Location: android/app/build/outputs/apk/debug/app-debug.apk
+📱 APK Artifacts:
+─────────────────────────────────────────
+🔴 Debug APK (requires Metro):
+   Location: android/app/build/outputs/apk/debug/app-debug.apk
+   Size: ${DEBUG_SIZE}
+   
+🟢 Release APK (standalone - RECOMMENDED):
+   Location: android/app/build/outputs/apk/release/app-release.apk
+   Size: ${RELEASE_SIZE}
 
 Download: ${BUILD_URL}artifact/
 
+Note: Use Release APK for testing without Metro bundler
 EOF
                     cat build-info.txt
                 '''
@@ -147,7 +184,9 @@ EOF
             echo '🏁 Pipeline execution completed'
         }
         success {
-            echo "✅ BUILD SUCCESSFUL! APK ready for download: ${BUILD_URL}artifact/"
+            echo "✅ BUILD SUCCESSFUL!"
+            echo "📱 Release APK (standalone): ${BUILD_URL}artifact/android/app/build/outputs/apk/release/app-release.apk"
+            echo "🔧 Debug APK (needs Metro): ${BUILD_URL}artifact/android/app/build/outputs/apk/debug/app-debug.apk"
         }
         failure {
             echo "❌ BUILD FAILED! Check console: ${BUILD_URL}console"
