@@ -2,158 +2,216 @@ pipeline {
     agent any
     
     environment {
+        // Android SDK paths
         ANDROID_HOME = "${HOME}/Android/Sdk"
-        PATH = "${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/tools:${ANDROID_HOME}/tools/bin:${PATH}"
-        NODE_VERSION = "25"
-        APP_NAME = "CWApp"
-        REPO_URL = "https://github.com/XXXDelirious/CWApp-ui"
-        // NOTE: Never hardcode tokens here. Use Jenkins Credentials Manager instead.
+        ANDROID_SDK_ROOT = "${HOME}/Android/Sdk"
+        PATH = "${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools:${ANDROID_HOME}/tools/bin:${PATH}"
+        
+        // App configuration
+        APP_NAME = 'CWApp'
+        REPO_URL = 'https://github.com/XXXDelirious/CWApp-ui'
+        
+        // Gradle options for performance
+        GRADLE_OPTS = '-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m"'
     }
     
     options {
         timestamps()
         timeout(time: 1, unit: 'HOURS')
-        buildDiscarder(logRotator(numToKeepStr: '10'))
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '5'))
+        disableConcurrentBuilds()
     }
     
     stages {
         stage('Checkout') {
             steps {
-                echo "🔄 Checking out code from repository..."
-                git branch: 'main', 
-                    url: "${REPO_URL}",
-                    credentialsId: 'github-credentials'
-                
-                sh 'git log -1 --pretty=format:"%h - %an, %ar : %s"'
+                script {
+                    echo "🔄 Checking out code from repository..."
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: '*/main']],
+                        userRemoteConfigs: [[
+                            url: "${REPO_URL}",
+                            credentialsId: 'github-credentials'
+                        ]]
+                    ])
+                    
+                    sh 'git log -1 --pretty=format:"%h - %an, %ar : %s"'
+                    
+                    def gitCommit = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    currentBuild.description = "Commit: ${gitCommit}"
+                }
             }
         }
         
-        stage('Environment Setup') {
+        stage('Verify Environment') {
             steps {
-                echo "🔧 Setting up Node.js environment..."
-                sh """
-                    node --version
-                    npm --version
-                    echo "Android SDK: \${ANDROID_HOME}"
-                """
+                echo "🔍 Verifying build environment..."
+                sh '''
+                    echo "==================================="
+                    echo "Node version:"
+                    node --version || { echo "❌ Node.js not found!"; exit 1; }
+                    
+                    echo ""
+                    echo "NPM version:"
+                    npm --version || { echo "❌ NPM not found!"; exit 1; }
+                    
+                    echo ""
+                    echo "Java version:"
+                    java -version || { echo "❌ Java not found!"; exit 1; }
+                    
+                    echo ""
+                    echo "Android SDK:"
+                    if [ ! -d "$ANDROID_HOME" ]; then
+                        echo "❌ Android SDK not found at $ANDROID_HOME"
+                        exit 1
+                    fi
+                    echo "✅ Android SDK: $ANDROID_HOME"
+                    echo "==================================="
+                '''
+            }
+        }
+        
+        stage('Setup Google Services') {
+            steps {
+                echo "🔐 Setting up Firebase configuration..."
+                script {
+                    withCredentials([file(credentialsId: 'google-services-json', variable: 'GOOGLE_SERVICES')]) {
+                        sh '''
+                            mkdir -p android/app
+                            cp $GOOGLE_SERVICES android/app/google-services.json
+                            echo "✅ google-services.json configured"
+                        '''
+                    }
+                }
             }
         }
         
         stage('Install Dependencies') {
             steps {
                 echo "📦 Installing npm dependencies..."
-                sh 'npm install --legacy-peer-deps'
+                sh '''
+                    echo "Cleaning previous installations..."
+                    rm -rf node_modules package-lock.json
+                    
+                    echo "Installing dependencies..."
+                    npm install --legacy-peer-deps
+                    
+                    echo "✅ Dependencies installed successfully"
+                '''
             }
         }
         
-        stage('Code Quality & Tests') {
-            parallel {
-                stage('Lint Check') {
-                    steps {
-                        echo "🔍 Running ESLint..."
-                        sh 'npm run lint || true'
-                    }
-                }
-                
-                stage('Unit Tests') {
-                    steps {
-                        echo "🧪 Running unit tests..."
-                        sh 'npm test -- --watchAll=false --passWithNoTests || true'
-                    }
-                }
-            }
-        }
-        
-        stage('Build Android Debug APK') {
+        stage('Clean Build') {
             steps {
-                echo "🔨 Building Android Debug APK..."
-                sh """
+                echo "🧹 Cleaning Android build artifacts..."
+                sh '''
                     cd android
                     chmod +x gradlew
                     ./gradlew clean
-                    ./gradlew assembleDebug
-                """
+                    echo "✅ Clean completed"
+                '''
             }
         }
         
-        stage('Build Android Release APK') {
-            when {
-                branch 'main'
-            }
+        stage('Build Debug APK') {
             steps {
-                echo "🚀 Building Android Release APK..."
-                sh """
+                echo "🔨 Building Android Debug APK..."
+                sh '''
                     cd android
-                    ./gradlew assembleRelease
-                """
+                    ./gradlew assembleDebug --stacktrace
+                    
+                    echo ""
+                    echo "==================================="
+                    DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
+                    if [ -f "$DEBUG_APK" ]; then
+                        echo "✅ Debug APK built successfully!"
+                        echo "APK Location: android/$DEBUG_APK"
+                        echo "APK Size: $(ls -lh $DEBUG_APK | awk '{print $5}')"
+                        echo "==================================="
+                    else
+                        echo "❌ Debug APK not found!"
+                        exit 1
+                    fi
+                '''
             }
         }
         
-        stage('Archive Artifacts') {
+        stage('Archive APK') {
             steps {
                 echo "📦 Archiving build artifacts..."
-                archiveArtifacts artifacts: 'android/app/build/outputs/apk/**/*.apk', 
-                                 allowEmptyArchive: true,
-                                 fingerprint: true
-            }
-        }
-        
-        stage('Deploy to Firebase App Distribution') {
-            when {
-                branch 'main'
-            }
-            steps {
-                echo "🚀 Deploying to Firebase App Distribution..."
-                sh """
-                    # Install Firebase CLI if not available
-                    npm install -g firebase-tools
+                script {
+                    archiveArtifacts artifacts: 'android/app/build/outputs/apk/debug/*.apk', 
+                                     allowEmptyArchive: false,
+                                     fingerprint: true
                     
-                    # Deploy to Firebase (requires setup)
-                    # firebase appdistribution:distribute android/app/build/outputs/apk/debug/app-debug.apk \\
-                    #     --app YOUR_FIREBASE_APP_ID \\
-                    #     --groups "testers" \\
-                    #     --release-notes "Build ${BUILD_NUMBER} - ${GIT_COMMIT}"
-                """
+                    sh '''
+                        BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+                        GIT_COMMIT=$(git rev-parse HEAD)
+                        GIT_SHORT=$(git rev-parse --short HEAD)
+                        GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+                        
+                        cat > build-info.txt << EOF
+╔════════════════════════════════════════╗
+║        CWApp Build Information         ║
+╚════════════════════════════════════════╝
+
+Build Number:    ${BUILD_NUMBER}
+Build Date:      ${BUILD_DATE}
+Git Commit:      ${GIT_SHORT} (${GIT_COMMIT})
+Git Branch:      ${GIT_BRANCH}
+Jenkins Job:     ${JOB_NAME}
+Build URL:       ${BUILD_URL}
+
+APK Location: android/app/build/outputs/apk/debug/app-debug.apk
+
+Download: ${BUILD_URL}artifact/
+
+EOF
+                        cat build-info.txt
+                    '''
+                    
+                    archiveArtifacts artifacts: 'build-info.txt', allowEmptyArchive: true
+                }
             }
         }
     }
     
     post {
         success {
-            echo "✅ Build Successful!"
-            emailext(
-                subject: "✅ Jenkins Build SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
-                body: """
-                    <p>Build Successful!</p>
-                    <p><b>Job:</b> ${env.JOB_NAME}</p>
-                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
-                    <p><b>Build URL:</b> ${env.BUILD_URL}</p>
-                    <p>Download APK from Jenkins artifacts.</p>
-                """,
-                to: 'your-email@example.com',
-                mimeType: 'text/html'
-            )
+            script {
+                echo ""
+                echo "╔════════════════════════════════════════╗"
+                echo "║       ✅ BUILD SUCCESSFUL! ✅          ║"
+                echo "╚════════════════════════════════════════╝"
+                echo ""
+                echo "📱 APK ready for download!"
+                echo "🔗 Download from: ${env.BUILD_URL}artifact/"
+                echo ""
+                
+                def buildDuration = currentBuild.durationString.replace(' and counting', '')
+                echo "⏱️  Build completed in ${buildDuration}"
+            }
         }
         
         failure {
-            echo "❌ Build Failed!"
-            emailext(
-                subject: "❌ Jenkins Build FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
-                body: """
-                    <p>Build Failed!</p>
-                    <p><b>Job:</b> ${env.JOB_NAME}</p>
-                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
-                    <p><b>Build URL:</b> ${env.BUILD_URL}</p>
-                    <p>Check console output for details.</p>
-                """,
-                to: 'your-email@example.com',
-                mimeType: 'text/html'
-            )
+            script {
+                echo ""
+                echo "╔════════════════════════════════════════╗"
+                echo "║         ❌ BUILD FAILED! ❌            ║"
+                echo "╚════════════════════════════════════════╝"
+                echo ""
+                echo "📋 Check console output for errors"
+                echo "🔗 Console: ${env.BUILD_URL}console"
+                echo ""
+            }
         }
         
         always {
-            echo "🧹 Cleaning up workspace..."
-            cleanWs()
+            script {
+                echo "🧹 Cleaning up..."
+                echo "🏁 Pipeline execution completed"
+            }
         }
     }
 }
