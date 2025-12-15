@@ -63,15 +63,15 @@ const habits = [
   { id: '6', title: 'Mindfulness', color: '#B99DFF', description: 'Be present...' },
 ];
 
-export default function HomeScreen({ navigation, route }) {
+export default function ProviderHomeScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [productList, setProductList] = useState(products);
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
 
-  const userName = route?.params?.userName || 'User';
-  const userAddress = '123 Techzone IV, Greater Noida West, UP';
+  const userName = route?.params?.userName || 'Provider';
+  const userAddress = '7890 Techzone I, Noida, UP';
 
   const handleFavoriteToggle = (productId) => {
     setProductList((prevProducts) =>
@@ -117,7 +117,7 @@ export default function HomeScreen({ navigation, route }) {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <Image
-              source={require('../../assets/profile-placeholder.jpg')}
+              source={require('../../assets/profile-placeholder2.png')}
               style={styles.profileImage}
             />
             <View style={styles.userInfo}>

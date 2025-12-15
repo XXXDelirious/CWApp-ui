@@ -21,7 +21,7 @@ import { AuthContext } from '../context/AuthContext';
 
 export default function OTPVerificationScreen({ navigation, route }) {
 
-  // Get confirmation from context instead of route params
+  // Read Firebase confirmation object from AuthContext instead of route params
   const { confirmation } = useContext(AuthContext);
   const { t, i18n } = useTranslation();
 
@@ -74,23 +74,21 @@ export default function OTPVerificationScreen({ navigation, route }) {
 
       Alert.alert(t('success'), t('otpVerifiedSuccessfully'));
 
-      // Navigate to next screen
-      navigation.replace("HomeScreen", {
+      navigation.replace('ProviderHomeScreen', {
         language,
         accountType,
         phoneNumber,
       });
-
     } catch (error) {
-      console.log(t('otpVerificationError'), error);
-      Alert.alert(t('otpFailed'), error.message || t('invalidOTPTryAgain'));
+      console.log("OTP Verification Error", error);
+      Alert.alert("OTP Failed", error.message || "Invalid OTP, try again.");
     }
   };
 
   const handleResendOTP = () => {
     setOtp(['', '', '', '', '', '']);
     inputRefs[0].current?.focus();
-    Alert.alert(t('otpSent'), t('newOTPSentToNumber'));
+    Alert.alert("OTP Sent", "A new OTP has been sent to your number.");
   };
 
   useEffect(() => {
