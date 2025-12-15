@@ -1,217 +1,232 @@
 pipeline {
     agent any
-    
+
     environment {
-        // Android SDK paths
-        ANDROID_HOME = "${HOME}/Android/Sdk"
-        ANDROID_SDK_ROOT = "${HOME}/Android/Sdk"
-        PATH = "${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/tools:${ANDROID_HOME}/tools/bin:${PATH}"
-        
+        // ===============================
+        // Android SDK (shared with Jenkins)
+        // ===============================
+        ANDROID_HOME = '/home/acer/Android/Sdk'
+        ANDROID_SDK_ROOT = '/home/acer/Android/Sdk'
+
+        // Append SDK tools to PATH (do NOT override)
+        PATH = "/home/acer/Android/Sdk/platform-tools:/home/acer/Android/Sdk/cmdline-tools/latest/bin:${env.PATH}"
+
+        // ===============================
         // App configuration
+        // ===============================
         APP_NAME = 'CWApp'
         REPO_URL = 'https://github.com/XXXDelirious/CWApp-ui'
-        
-        // Gradle options for performance
-        GRADLE_OPTS = '-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=512m"'
+
+        // ===============================
+        // Gradle performance (CI-safe)
+        // ===============================
+        GRADLE_OPTS = '-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.jvmargs=-Xmx4g,-XX:MaxMetaspaceSize=512m'
     }
-    
+
     options {
         timestamps()
         timeout(time: 1, unit: 'HOURS')
-        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '5'))
         disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '5'))
     }
-    
+
     stages {
+
+        // ===============================
+        // Checkout
+        // ===============================
         stage('Checkout') {
             steps {
+                echo '🔄 Checking out source code...'
+
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[
+                        url: REPO_URL,
+                        credentialsId: 'github-credentials'
+                    ]]
+                ])
+
+                sh 'git log -1 --pretty=format:"%h - %an, %ar : %s"'
+
                 script {
-                    echo "🔄 Checking out code from repository..."
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: '*/main']],
-                        userRemoteConfigs: [[
-                            url: "${REPO_URL}",
-                            credentialsId: 'github-credentials'
-                        ]]
-                    ])
-                    
-                    sh 'git log -1 --pretty=format:"%h - %an, %ar : %s"'
-                    
-                    def gitCommit = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    def gitCommit = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
                     currentBuild.description = "Commit: ${gitCommit}"
                 }
             }
         }
-        
+
+        // ===============================
+        // Verify Environment
+        // ===============================
         stage('Verify Environment') {
             steps {
-                echo "🔍 Verifying build environment..."
+                echo '🔍 Verifying build environment...'
                 sh '''
-                    echo "==================================="
-                    echo "Node version:"
-                    node --version || { echo "❌ Node.js not found!"; exit 1; }
-                    
+                    set -e
+
+                    echo "Node:"
+                    node --version
+
                     echo ""
-                    echo "NPM version:"
-                    npm --version || { echo "❌ NPM not found!"; exit 1; }
-                    
+                    echo "NPM:"
+                    npm --version
+
                     echo ""
-                    echo "Java version:"
-                    java -version || { echo "❌ Java not found!"; exit 1; }
-                    
+                    echo "Java:"
+                    java -version
+
                     echo ""
                     echo "Android SDK:"
-                    if [ ! -d "$ANDROID_HOME" ]; then
-                        echo "❌ Android SDK not found at $ANDROID_HOME"
-                        exit 1
-                    fi
-                    echo "✅ Android SDK: $ANDROID_HOME"
-                    echo "==================================="
+                    echo "ANDROID_HOME=$ANDROID_HOME"
+                    [ -d "$ANDROID_HOME" ]
+
+                    echo ""
+                    echo "sdkmanager:"
+                    sdkmanager --version
+
+                    echo ""
+                    echo "adb:"
+                    adb version
+
+                    echo "✅ Environment verified"
                 '''
             }
         }
-        
+
+        // ===============================
+        // Firebase / Google Services
+        // ===============================
         stage('Setup Google Services') {
             steps {
-                echo "🔐 Setting up Firebase configuration..."
-                script {
-                    withCredentials([file(credentialsId: 'google-services-json', variable: 'GOOGLE_SERVICES')]) {
-                        sh '''
-                            mkdir -p android/app
-                            cp $GOOGLE_SERVICES android/app/google-services.json
-                            echo "✅ google-services.json configured"
-                        '''
-                    }
+                echo '🔐 Configuring Firebase (google-services.json)...'
+                withCredentials([
+                    file(credentialsId: 'google-services-json', variable: 'GOOGLE_SERVICES')
+                ]) {
+                    sh '''
+                        mkdir -p android/app
+                        cp "$GOOGLE_SERVICES" android/app/google-services.json
+                        echo "✅ google-services.json configured"
+                    '''
                 }
             }
         }
-        
+
+        // ===============================
+        // Install JS Dependencies
+        // ===============================
         stage('Install Dependencies') {
             steps {
-                echo "📦 Installing npm dependencies..."
+                echo '📦 Installing npm dependencies...'
                 sh '''
-                    echo "Cleaning previous installations..."
-                    rm -rf node_modules package-lock.json
-                    
-                    echo "Installing dependencies..."
+                    rm -rf node_modules
                     npm install --legacy-peer-deps
-                    
-                    echo "✅ Dependencies installed successfully"
                 '''
             }
         }
-        
+
+        // ===============================
+        // Clean Android Build
+        // ===============================
         stage('Clean Build') {
             steps {
-                echo "🧹 Cleaning Android build artifacts..."
+                echo '🧹 Cleaning Android build...'
                 sh '''
                     cd android
                     chmod +x gradlew
                     ./gradlew clean
-                    echo "✅ Clean completed"
                 '''
             }
         }
-        
+
+        // ===============================
+        // Build Debug APK
+        // ===============================
         stage('Build Debug APK') {
             steps {
-                echo "🔨 Building Android Debug APK..."
+                echo '🔨 Building Debug APK...'
                 sh '''
                     cd android
-                    ./gradlew assembleDebug --stacktrace
-                    
+
+                    ./gradlew assembleDebug \
+                        --no-daemon \
+                        --parallel \
+                        --build-cache \
+                        --stacktrace
+
+                    APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+
                     echo ""
-                    echo "==================================="
-                    DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
-                    if [ -f "$DEBUG_APK" ]; then
-                        echo "✅ Debug APK built successfully!"
-                        echo "APK Location: android/$DEBUG_APK"
-                        echo "APK Size: $(ls -lh $DEBUG_APK | awk '{print $5}')"
-                        echo "==================================="
+                    if [ -f "$APK_PATH" ]; then
+                        echo "✅ APK built successfully"
+                        echo "📦 Location: android/$APK_PATH"
+                        echo "📏 Size: $(ls -lh $APK_PATH | awk '{print $5}')"
                     else
-                        echo "❌ Debug APK not found!"
+                        echo "❌ APK not found!"
                         exit 1
                     fi
                 '''
             }
         }
-        
+
+        // ===============================
+        // Archive Artifacts
+        // ===============================
         stage('Archive APK') {
             steps {
-                echo "📦 Archiving build artifacts..."
-                script {
-                    archiveArtifacts artifacts: 'android/app/build/outputs/apk/debug/*.apk', 
-                                     allowEmptyArchive: false,
-                                     fingerprint: true
-                    
-                    sh '''
-                        BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
-                        GIT_COMMIT=$(git rev-parse HEAD)
-                        GIT_SHORT=$(git rev-parse --short HEAD)
-                        GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-                        
-                        cat > build-info.txt << EOF
-╔════════════════════════════════════════╗
-║        CWApp Build Information         ║
-╚════════════════════════════════════════╝
+                echo '📦 Archiving APK...'
 
-Build Number:    ${BUILD_NUMBER}
-Build Date:      ${BUILD_DATE}
-Git Commit:      ${GIT_SHORT} (${GIT_COMMIT})
-Git Branch:      ${GIT_BRANCH}
-Jenkins Job:     ${JOB_NAME}
-Build URL:       ${BUILD_URL}
+                archiveArtifacts(
+                    artifacts: 'android/app/build/outputs/apk/debug/*.apk',
+                    fingerprint: true
+                )
 
-APK Location: android/app/build/outputs/apk/debug/app-debug.apk
+                sh '''
+                    BUILD_DATE=$(date '+%Y-%m-%d %H:%M:%S')
+                    GIT_COMMIT=$(git rev-parse HEAD)
+                    GIT_SHORT=$(git rev-parse --short HEAD)
+                    GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
-Download: ${BUILD_URL}artifact/
+                    cat > build-info.txt << EOF
+CWApp Build Information
+----------------------
+Build Number : ${BUILD_NUMBER}
+Build Date   : ${BUILD_DATE}
+Git Commit   : ${GIT_SHORT} (${GIT_COMMIT})
+Git Branch   : ${GIT_BRANCH}
+Job Name     : ${JOB_NAME}
+Build URL    : ${BUILD_URL}
 
+APK:
+android/app/build/outputs/apk/debug/app-debug.apk
 EOF
-                        cat build-info.txt
-                    '''
-                    
-                    archiveArtifacts artifacts: 'build-info.txt', allowEmptyArchive: true
-                }
+                '''
+
+                archiveArtifacts artifacts: 'build-info.txt'
             }
         }
     }
-    
+
     post {
         success {
-            script {
-                echo ""
-                echo "╔════════════════════════════════════════╗"
-                echo "║       ✅ BUILD SUCCESSFUL! ✅          ║"
-                echo "╚════════════════════════════════════════╝"
-                echo ""
-                echo "📱 APK ready for download!"
-                echo "🔗 Download from: ${env.BUILD_URL}artifact/"
-                echo ""
-                
-                def buildDuration = currentBuild.durationString.replace(' and counting', '')
-                echo "⏱️  Build completed in ${buildDuration}"
-            }
+            echo ''
+            echo '✅ BUILD SUCCESSFUL'
+            echo "📱 Download APK: ${env.BUILD_URL}artifact/"
+            echo "⏱️  Duration: ${currentBuild.durationString}"
         }
-        
+
         failure {
-            script {
-                echo ""
-                echo "╔════════════════════════════════════════╗"
-                echo "║         ❌ BUILD FAILED! ❌            ║"
-                echo "╚════════════════════════════════════════╝"
-                echo ""
-                echo "📋 Check console output for errors"
-                echo "🔗 Console: ${env.BUILD_URL}console"
-                echo ""
-            }
+            echo ''
+            echo '❌ BUILD FAILED'
+            echo "🔍 Console: ${env.BUILD_URL}console"
         }
-        
+
         always {
-            script {
-                echo "🧹 Cleaning up..."
-                echo "🏁 Pipeline execution completed"
-            }
+            echo '🏁 Pipeline finished'
         }
     }
 }
