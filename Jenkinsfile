@@ -5,10 +5,10 @@ pipeline {
         ANDROID_HOME = '/home/acer/Android/Sdk'
         ANDROID_SDK_ROOT = '/home/acer/Android/Sdk'
 
-        APP_NAME = 'CWApp'
-        REPO_URL = 'https://github.com/XXXDelirious/CWApp-ui'
+        SDKMANAGER = '/home/acer/Android/Sdk/cmdline-tools/latest/bin/sdkmanager'
+        ADB = '/home/acer/Android/Sdk/platform-tools/adb'
 
-        GRADLE_OPTS = '-Dorg.gradle.daemon=false'
+        REPO_URL = 'https://github.com/XXXDelirious/CWApp-ui'
     }
 
     options {
@@ -28,22 +28,26 @@ pipeline {
 
         stage('Verify Environment') {
             steps {
-                withEnv([
-                    "PATH=${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/cmdline-tools/latest/bin:${env.PATH}"
-                ]) {
-                    sh '''
-                        set -e
-                        echo "Node:"
-                        node --version
-                        echo "Java:"
-                        java -version
-                        echo "sdkmanager:"
-                        sdkmanager --version
-                        echo "adb:"
-                        adb version
-                        echo "✅ Environment OK"
-                    '''
-                }
+                sh '''
+                    set -e
+
+                    echo "Node:"
+                    node --version
+
+                    echo "Java:"
+                    java -version
+
+                    echo "Android SDK:"
+                    [ -d "$ANDROID_HOME" ]
+
+                    echo "sdkmanager:"
+                    $SDKMANAGER --version
+
+                    echo "adb:"
+                    $ADB version
+
+                    echo "✅ Environment OK"
+                '''
             }
         }
 
@@ -71,29 +75,21 @@ pipeline {
 
         stage('Clean Build') {
             steps {
-                withEnv([
-                    "PATH=${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/cmdline-tools/latest/bin:${env.PATH}"
-                ]) {
-                    sh '''
-                        cd android
-                        chmod +x gradlew
-                        ./gradlew clean
-                    '''
-                }
+                sh '''
+                    cd android
+                    chmod +x gradlew
+                    ./gradlew clean
+                '''
             }
         }
 
         stage('Build Debug APK') {
             steps {
-                withEnv([
-                    "PATH=${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/cmdline-tools/latest/bin:${env.PATH}"
-                ]) {
-                    sh '''
-                        cd android
-                        ./gradlew assembleDebug --no-daemon --stacktrace
-                        test -f app/build/outputs/apk/debug/app-debug.apk
-                    '''
-                }
+                sh '''
+                    cd android
+                    ./gradlew assembleDebug --no-daemon --stacktrace
+                    test -f app/build/outputs/apk/debug/app-debug.apk
+                '''
             }
         }
 
