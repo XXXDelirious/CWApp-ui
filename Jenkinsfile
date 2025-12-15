@@ -3,13 +3,13 @@ pipeline {
 
     environment {
         // ===============================
-        // Android SDK (shared with Jenkins)
+        // Android SDK (shared SDK)
         // ===============================
         ANDROID_HOME = '/home/acer/Android/Sdk'
         ANDROID_SDK_ROOT = '/home/acer/Android/Sdk'
 
-        // Append SDK tools to PATH (do NOT override)
-        PATH = "/home/acer/Android/Sdk/platform-tools:/home/acer/Android/Sdk/cmdline-tools/latest/bin:${env.PATH}"
+        // ✅ Jenkins-safe PATH extension (CRITICAL FIX)
+        PATH+ANDROID = '/home/acer/Android/Sdk/platform-tools:/home/acer/Android/Sdk/cmdline-tools/latest/bin'
 
         // ===============================
         // App configuration
@@ -43,8 +43,7 @@ pipeline {
                     $class: 'GitSCM',
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
-                        url: REPO_URL,
-                        credentialsId: 'github-credentials'
+                        url: REPO_URL
                     ]]
                 ])
 
@@ -93,6 +92,7 @@ pipeline {
                     echo "adb:"
                     adb version
 
+                    echo ""
                     echo "✅ Environment verified"
                 '''
             }
