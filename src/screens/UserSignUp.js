@@ -1,5 +1,5 @@
 //UserSignUp.js
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import {
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import { AuthContext } from '../context/AuthContext';
 import auth from '@react-native-firebase/auth';
 
 export default function UserSignUpScreen({ navigation, route }) {
@@ -22,8 +24,10 @@ export default function UserSignUpScreen({ navigation, route }) {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
+  const { t, i18n } = useTranslation();
+  const { setConfirmation } = useContext(AuthContext);
 
-  const language = route?.params?.language || 'en';
+  const language = i18n.language || 'en';
   const accountType = route?.params?.accountType || 'user';
 
   const isFormValid = phoneNumber.length >= 10 && termsAccepted;
@@ -37,21 +41,23 @@ export default function UserSignUpScreen({ navigation, route }) {
     try {
       const confirmation = await auth().signInWithPhoneNumber(fullPhone);
 
+      // Store confirmation in context instead of navigation params
+      setConfirmation(confirmation);
+
       setLoading(false);
 
       navigation.navigate('OTPVerification', {
         language,
         accountType,
         phoneNumber: fullPhone,
-        confirmation, // 🔥 Passing confirmation object to verify later
       });
     } catch (error) {
       setLoading(false);
       console.log('OTP Error:', error);
 
       Alert.alert(
-        'OTP Failed',
-        error.message || 'Failed to send OTP. Try again.'
+        t('otpFailed'),
+        error.message || t('failedToSendOTP')
       );
     }
   };
@@ -74,7 +80,7 @@ export default function UserSignUpScreen({ navigation, route }) {
           keyboardShouldPersistTaps="handled"
         >
           {/* Title */}
-          <Text style={styles.title}>Sign Up / Log In</Text>
+          <Text style={styles.title}>{t('signUpLogIn')}</Text>
 
           {/* Phone Number Input */}
           <View style={styles.inputContainer}>
@@ -82,7 +88,7 @@ export default function UserSignUpScreen({ navigation, route }) {
             <View style={styles.divider} />
             <TextInput
               style={styles.input}
-              placeholder="Enter Phone Number"
+              placeholder={t('enterPhoneNumber')}
               placeholderTextColor="rgba(0, 0, 0, 0.3)"
               value={phoneNumber}
               onChangeText={setPhoneNumber}
@@ -92,7 +98,7 @@ export default function UserSignUpScreen({ navigation, route }) {
           </View>
 
           <Text style={styles.infoText}>
-            You will receive an OTP to your number
+            {t('youWillReceiveOTP')}
           </Text>
 
           {/* Terms */}
@@ -112,10 +118,10 @@ export default function UserSignUpScreen({ navigation, route }) {
             </TouchableOpacity>
 
             <Text style={styles.termsText}>
-              I agree to the{' '}
-              <Text style={styles.termsLink}>Terms of Services</Text>
-              {' & '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>
+              {t('iAgreeToTerms')}{' '}
+              <Text style={styles.termsLink}>{t('termsOfService')}</Text>
+              {' '}{t('and')}{' '}
+              <Text style={styles.termsLink}>{t('privacyPolicy')}</Text>
             </Text>
           </View>
         </ScrollView>
@@ -132,7 +138,7 @@ export default function UserSignUpScreen({ navigation, route }) {
           disabled={!isFormValid || loading}
         >
           <Text style={styles.sendOTPButtonText}>
-            {loading ? 'Sending...' : 'Send OTP'}
+            {loading ? t('sending') : t('sendOTP')}
           </Text>
         </TouchableOpacity>
       </View>

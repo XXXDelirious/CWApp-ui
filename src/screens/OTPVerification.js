@@ -1,6 +1,6 @@
 // OTPVerification.js
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -16,16 +16,19 @@ import {
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import { AuthContext } from '../context/AuthContext';
 
 export default function OTPVerificationScreen({ navigation, route }) {
 
-  // 🔥 Read Firebase confirmation object here
-  const confirmation = route?.params?.confirmation || null;
+  // Get confirmation from context instead of route params
+  const { confirmation } = useContext(AuthContext);
+  const { t, i18n } = useTranslation();
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']); // 6 digits
   const insets = useSafeAreaInsets();
 
-  const language = route?.params?.language || 'en';
+  const language = i18n.language || 'en';
   const accountType = route?.params?.accountType || 'user';
   const phoneNumber = route?.params?.phoneNumber || '+91';
 
@@ -54,14 +57,14 @@ export default function OTPVerificationScreen({ navigation, route }) {
 
   const handleVerify = async () => {
     if (!confirmation) {
-      Alert.alert('Error', 'Missing confirmation object.');
+      Alert.alert(t('error'), t('missingConfirmation'));
       return;
     }
 
     const otpCode = otp.join('');
 
     if (otpCode.length !== 6) {
-      Alert.alert("Invalid OTP", "Please enter the 6-digit OTP.");
+      Alert.alert(t('invalidOTP'), t('pleaseEnterOTP'));
       return;
     }
 
@@ -69,7 +72,7 @@ export default function OTPVerificationScreen({ navigation, route }) {
       console.log("Verifying OTP:", otpCode);
       await confirmation.confirm(otpCode);
 
-      Alert.alert("Success", "OTP Verified Successfully!");
+      Alert.alert(t('success'), t('otpVerifiedSuccessfully'));
 
       // Navigate to next screen
       navigation.replace("HomeScreen", {
@@ -79,15 +82,15 @@ export default function OTPVerificationScreen({ navigation, route }) {
       });
 
     } catch (error) {
-      console.log("OTP Verification Error", error);
-      Alert.alert("OTP Failed", error.message || "Invalid OTP, try again.");
+      console.log(t('otpVerificationError'), error);
+      Alert.alert(t('otpFailed'), error.message || t('invalidOTPTryAgain'));
     }
   };
 
   const handleResendOTP = () => {
     setOtp(['', '', '', '', '', '']);
     inputRefs[0].current?.focus();
-    Alert.alert("OTP Sent", "A new OTP has been sent to your number.");
+    Alert.alert(t('otpSent'), t('newOTPSentToNumber'));
   };
 
   useEffect(() => {
@@ -108,10 +111,10 @@ export default function OTPVerificationScreen({ navigation, route }) {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>OTP Verification</Text>
+          <Text style={styles.title}>{t('otpVerification')}</Text>
 
           <Text style={styles.infoText}>
-            Enter the OTP sent to <Text style={styles.phoneNumber}>{phoneNumber}</Text>
+            {t('enterOTPSentTo')} <Text style={styles.phoneNumber}>{phoneNumber}</Text>
           </Text>
 
           {/* OTP Boxes */}
@@ -132,7 +135,7 @@ export default function OTPVerificationScreen({ navigation, route }) {
 
           {/* Resend */}
           <TouchableOpacity onPress={handleResendOTP}>
-            <Text style={styles.resendLink}>Resend OTP</Text>
+            <Text style={styles.resendLink}>{t('resendOTP')}</Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -144,7 +147,7 @@ export default function OTPVerificationScreen({ navigation, route }) {
           disabled={!isFormValid}
           onPress={handleVerify}
         >
-          <Text style={styles.verifyButtonText}>Verify</Text>
+          <Text style={styles.verifyButtonText}>{t('verify')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

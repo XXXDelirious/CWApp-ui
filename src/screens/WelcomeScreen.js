@@ -1,6 +1,6 @@
 // WelcomeScreen.js
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -12,46 +12,63 @@ import {
   Dimensions,
 } from 'react-native';
 
-// ✅ Use SafeAreaView from safe-area-context (fix deprecation warning)
+// Use SafeAreaView from safe-area-context (fix deprecation warning)
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 export default function WelcomeScreen() {
   const navigation = useNavigation();
 
-  // Auto-navigate after 5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      navigation.navigate('LanguageSelection');
-    }, 1000);
+  // Navigate to LanguageSelection
+  const handleNavigate = () => {
+    navigation.navigate('LanguageSelection');
+  };
 
-    return () => clearTimeout(timer);
-  }, [navigation]);
+  // Auto-navigate after 5 seconds when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const timer = setTimeout(() => {
+        handleNavigate();
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }, [])
+  );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView
+      style={styles.container}
+      edges={['top', 'left', 'right']}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        style={styles.touchableContainer}
+        onPress={handleNavigate}
+      >
+        <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+        
+        <ScrollView contentContainerStyle={styles.scrollContent}>
 
-        {/* Main Content */}
-        <View style={styles.content}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/Alpha-Aid-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+          {/* Main Content */}
+          <View style={styles.content}>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../../assets/Alpha-Aid-logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            </View>
+
+            <Text style={styles.welcomeText}>Welcome</Text>
+                        <Text style={styles.copyrightText}>@copyright 2025 Alpha-aid Healthcare Pvt. Ltd</Text>
           </View>
 
-          <Text style={styles.welcomeText}>Welcome</Text>
-        </View>
+          {/* Home Indicator */}
+          <View style={styles.homeIndicator} />
 
-        {/* Home Indicator */}
-        <View style={styles.homeIndicator} />
-
-      </ScrollView>
+        </ScrollView>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -60,6 +77,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFF5F9',
+  },
+  touchableContainer: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
@@ -123,5 +143,12 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 15,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  copyrightText: {
+    fontSize: 12,
+    color: '#6b6b6b',
+    fontFamily: 'Poppins',
+    marginBottom: 12,
+    textAlign: 'center',
   },
 });
