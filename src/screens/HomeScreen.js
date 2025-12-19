@@ -16,12 +16,48 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 const services = [
-  { id: '1', name: 'DocHeal', icon: require('../../assets/doctor.png') },
-  { id: '2', name: 'Ammaheal', icon: require('../../assets/elderly.png') },
-  { id: '3', name: 'Counselors', icon: require('../../assets/counselor.png') },
-  { id: '4', name: 'Physioheal', icon: require('../../assets/physio.png') },
-  { id: '5', name: 'Health Educators', icon: require('../../assets/educator.png') },
-  { id: '6', name: 'Yoga Instructors', icon: require('../../assets/yoga.png') },
+  {
+    id: '1',
+    name: 'DocHeal',
+    icon: require('../../assets/doctor.png'),
+    route: null,
+    available: false,
+  },
+  {
+    id: '2',
+    name: 'Ammaheal',
+    icon: require('../../assets/elderly.png'),
+    route: 'AmmaList',
+    available: true,
+  },
+  {
+    id: '3',
+    name: 'Counselors',
+    icon: require('../../assets/counselor.png'),
+    route: null,
+    available: false,
+  },
+  {
+    id: '4',
+    name: 'Physioheal',
+    icon: require('../../assets/physio.png'),
+    route: null,
+    available: false,
+  },
+  {
+    id: '5',
+    name: 'Health Educators',
+    icon: require('../../assets/educator.png'),
+    route: null,
+    available: false,
+  },
+  {
+    id: '6',
+    name: 'Yoga Instructors',
+    icon: require('../../assets/yoga.png'),
+    route: null,
+    available: false,
+  },
 ];
 
 const products = [
@@ -159,19 +195,46 @@ export default function HomeScreen({ navigation, route }) {
         {/* Services Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('services')}</Text>
+
           <View style={styles.servicesGrid}>
-            {services.map((service) => (
-              <TouchableOpacity
-                key={service.id}
-                style={styles.serviceCard}
-                activeOpacity={0.7}
-              >
-                <View style={styles.serviceIconContainer}>
-                  <Text style={styles.serviceIconPlaceholder}>👨‍⚕️</Text>
-                </View>
-                <Text style={styles.serviceText}>{service.name}</Text>
-              </TouchableOpacity>
-            ))}
+            {services.map((service) => {
+              const disabled = !service.available;
+
+              return (
+                <TouchableOpacity
+                  key={service.id}
+                  activeOpacity={disabled ? 1 : 0.7}
+                  onPress={() => {
+                    if (!disabled && service.route) {
+                      navigation.navigate(service.route);
+                    }
+                  }}
+                  style={[
+                    styles.serviceCard,
+                    disabled && styles.serviceDisabled,
+                  ]}
+                >
+                  {/* Ribbon */}
+                  {disabled && (
+                    <View style={styles.ribbon}>
+                      <Text style={styles.ribbonText}>Coming Soon</Text>
+                    </View>
+                  )}
+
+                  {/* Icon */}
+                  <View style={styles.serviceIconContainer}>
+                    <Image
+                      source={service.icon}
+                      style={styles.serviceIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  {/* Text */}
+                  <Text style={styles.serviceText}>{service.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -434,23 +497,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 12,
   },
   serviceCard: {
     width: '30%',
     backgroundColor: '#FFF',
     borderRadius: 10,
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    marginBottom: 12,
+    elevation: 2,
+    overflow: 'hidden', // REQUIRED for ribbon
   },
+  serviceDisabled: {
+    opacity: 0.55,
+  },
+
   serviceIconContainer: {
-    width: 55,
-    height: 55,
+    width: 56,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -458,8 +523,12 @@ const styles = StyleSheet.create({
   serviceIconPlaceholder: {
     fontSize: 32,
   },
+  serviceIcon: {
+    width: 48,
+    height: 48,
+  },
   serviceText: {
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '700',
     color: '#000',
     textAlign: 'center',
@@ -643,4 +712,20 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
+  /* ---------- RIBBON ---------- */
+ribbon: {
+  position: 'absolute',
+  top: 15,
+  left: -22,
+  width: 90,
+  backgroundColor: '#F283AF',
+  transform: [{ rotate: '-45deg' }],
+  paddingVertical: 2,
+},
+ribbonText: {
+  color: '#FFF',
+  fontSize: 7,
+  fontWeight: '700',
+  textAlign: 'center',
+},
 });

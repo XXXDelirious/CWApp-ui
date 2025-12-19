@@ -1,154 +1,125 @@
-// WelcomeScreen.js
-
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  StatusBar,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Dimensions,
+  TextInput,
+  StyleSheet,
+  FlatList,
 } from 'react-native';
 
-// Use SafeAreaView from safe-area-context (fix deprecation warning)
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import AmmaCard from './AmmaCard';
+import { styles } from './AmmaListStyles';
 
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+const AMMA_DATA = [
+  {
+    id: '1',
+    name: 'Amma Name',
+    services: 'Services',
+    rating: 4.3,
+    age: 23,
+    price: 200,
+    time: '09:00 am - 11:00 am',
+    date: '12/12/2025',
+    isOnline: true,
+  },
+  {
+    id: '2',
+    name: 'Amma Name',
+    services: 'Services',
+    rating: 4.3,
+    age: 23,
+    price: 200,
+    time: '09:00 am - 11:00 am',
+    date: '12/12/2025',
+    isOnline: true,
+  },
+  {
+    id: '3',
+    name: 'Amma Name',
+    services: 'Services',
+    rating: 4.3,
+    age: 23,
+    price: 200,
+    time: '09:00 am - 11:00 am',
+    date: '12/12/2025',
+    isOnline: true,
+  },
+  {
+    id: '4',
+    name: 'Amma Name',
+    services: 'Services',
+    rating: 4.3,
+    age: 23,
+    price: 200,
+    time: '09:00 am - 11:00 am',
+    date: '12/12/2025',
+    isOnline: true,
+  },
+  {
+    id: '5',
+    name: 'Amma Name',
+    services: 'Services',
+    rating: 4.3,
+    age: 23,
+    price: 200,
+    time: '09:00 am - 11:00 am',
+    date: '12/12/2025',
+    isOnline: true,
+  },
+];
 
-export default function WelcomeScreen() {
-  const navigation = useNavigation();
+export default function AmmaListScreen({ navigation }) {
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Navigate to LanguageSelection
-  const handleNavigate = () => {
-    navigation.navigate('LanguageSelection');
+  const handleBackPress = () => {
+    if (navigation?.goBack) {
+      navigation.goBack();
+    }
   };
 
-  // Auto-navigate after 5 seconds when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      const timer = setTimeout(() => {
-        handleNavigate();
-      }, 5000);
-
-      return () => clearTimeout(timer);
-    }, [])
-  );
+  const renderAmmaCard = ({ item }) => <AmmaCard data={item} />;
 
   return (
-    <SafeAreaView
-      style={styles.container}
-      edges={['top', 'left', 'right']}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        style={styles.touchableContainer}
-        onPress={handleNavigate}
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        style={styles.safeArea}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
-        <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-        
-        <ScrollView contentContainerStyle={styles.scrollContent}>
 
-          {/* Main Content */}
-          <View style={styles.content}>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../assets/Alpha-Aid-logo.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Amma</Text>
+          <Text style={styles.location}> Providing care and housekeeping services.</Text>
+        </View>
 
-            <Text style={styles.welcomeText}>Welcome</Text>
-                        <Text style={styles.copyrightText}>@copyright 2025 Alpha-aid Healthcare Pvt. Ltd</Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputWrapper}>
+            <MaterialIcons name="search" size={20} color="#666" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search a Amma"
+              placeholderTextColor="rgba(0,0,0,0.2)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
           </View>
+        </View>
 
-          {/* Home Indicator */}
-          <View style={styles.homeIndicator} />
-
-        </ScrollView>
-      </TouchableOpacity>
+        {/* Amma List */}
+        <FlatList
+          scrollEnabled={false}
+          data={AMMA_DATA}
+          renderItem={renderAmmaCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+        />
+      </ScrollView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFF5F9',
-  },
-  touchableContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    zIndex: 10,
-  },
-  timeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#000',
-    fontFamily: 'Poppins',
-  },
-  iconGroup: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  icon: {
-    fontSize: 10,
-    opacity: 0.8,
-  },
-  content: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  logoContainer: {
-    width: 270,
-    height: 300,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logo: {
-    width: '100%',
-    height: '100%',
-  },
-  welcomeText: {
-    fontSize: 40,
-    fontWeight: '900',
-    color: '#444E80',
-    textAlign: 'center',
-    fontFamily: 'Raleway',
-    letterSpacing: 0.5,
-  },
-  homeIndicator: {
-    position: 'absolute',
-    bottom: 32,
-    width: 190,
-    height: 5,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-  },
-  copyrightText: {
-    fontSize: 12,
-    color: '#6b6b6b',
-    fontFamily: 'Poppins',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-});
