@@ -4,7 +4,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import { styles } from './AmmaListStyles';
 
-const AMMA_IMAGE = require('../../assets/AmmaName.png');
+//const AMMA_IMAGE = require('../../assets/AmmaName.png');
 
 export default function AmmaCard({ data }) {
   const [liked, setLiked] = useState(false);
