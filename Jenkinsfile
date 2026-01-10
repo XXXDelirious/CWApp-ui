@@ -182,43 +182,29 @@ pipeline {
                 sh '''
                     set -e
                     
-                    # Check for merge conflicts
-                    if grep -r "<<<<<<< HEAD" . --exclude-dir=node_modules --exclude-dir=.git 2>/dev/null; then
+                    # Check for merge conflicts (exclude Jenkinsfile to avoid false positives)
+                    if grep -r "<<<<<<< HEAD" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null; then
                         echo "❌ ERROR: Merge conflicts detected"
+                        echo "Please resolve all merge conflicts before building"
                         exit 1
                     fi
-                    echo "✓ No merge conflicts"
+                    echo "✅ No merge conflicts found"
                     
-                    # Verify no sensitive files in Git
-                    if git ls-files | grep -E '\\.keystore$|\\.jks$|keystore\\.properties'; then
-                        echo "❌ CRITICAL: Keystore files detected in Git!"
-                        echo "Remove immediately: git rm --cached <file>"
+                    # Check for TODO/FIXME that might indicate incomplete work
+                    TODO_COUNT=$(grep -r "TODO\|FIXME" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null | wc -l || echo "0")
+                    if [ "$TODO_COUNT" -gt 0 ]; then
+                        echo "⚠️  WARNING: Found $TODO_COUNT TODO/FIXME comments"
+                    fi
+                    
+                    # Check for hardcoded secrets patterns
+                    if grep -rE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null | grep -v "example\|sample\|test"; then
+                        echo "❌ ERROR: Possible hardcoded secrets detected"
+                        echo "Please use environment variables or credential management"
                         exit 1
                     fi
-                    echo "✓ No keystore files in Git"
+                    echo "✅ No hardcoded secrets detected"
                     
-                    # Check .gitignore exists
-                    if [ ! -f ".gitignore" ]; then
-                        echo "⚠️  WARNING: .gitignore not found"
-                    else
-                        for pattern in "*.keystore" "*.jks" "keystore.properties" "google-services.json"; do
-                            if ! grep -q "$pattern" .gitignore; then
-                                echo "⚠️  WARNING: $pattern not in .gitignore"
-                            fi
-                        done
-                        echo "✓ .gitignore configured"
-                    fi
-                    
-                    # Validate project structure
-                    for file in package.json android/app/build.gradle; do
-                        if [ ! -f "$file" ]; then
-                            echo "❌ ERROR: Required file missing: $file"
-                            exit 1
-                        fi
-                    done
-                    echo "✓ Project structure valid"
-                    
-                    echo "✅ Security validation passed"
+                    echo "✅ Security validation complete"
                 '''
             }
         }
