@@ -694,7 +694,7 @@ EOF
         success {
             script {
                 def durationSeconds = currentBuild.duration / 1000
-                def durationMinutes = Math.round(durationSeconds / 60 * 10) / 10
+                def durationMinutes = String.format("%.1f", durationSeconds / 60)
                 
                 echo "✅ BUILD SUCCESSFUL!"
                 echo ""
