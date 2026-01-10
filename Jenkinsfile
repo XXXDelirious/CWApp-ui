@@ -191,13 +191,13 @@ pipeline {
                     echo "✅ No merge conflicts found"
                     
                     # Check for TODO/FIXME that might indicate incomplete work
-                    TODO_COUNT=$(grep -r "TODO\|FIXME" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null | wc -l || echo "0")
+                    TODO_COUNT=$(grep -rE "TODO|FIXME" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null | wc -l || echo "0")
                     if [ "$TODO_COUNT" -gt 0 ]; then
                         echo "⚠️  WARNING: Found $TODO_COUNT TODO/FIXME comments"
                     fi
                     
                     # Check for hardcoded secrets patterns
-                    if grep -rE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null | grep -v "example\|sample\|test"; then
+                    if grep -rE "(password|secret|api_key|token)\\s*=\\s*['\"][^'\"]+['\"]" . --exclude-dir=node_modules --exclude-dir=.git --exclude=Jenkinsfile 2>/dev/null | grep -v "example\\|sample\\|test"; then
                         echo "❌ ERROR: Possible hardcoded secrets detected"
                         echo "Please use environment variables or credential management"
                         exit 1
