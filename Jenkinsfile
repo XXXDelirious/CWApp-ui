@@ -38,7 +38,7 @@ pipeline {
         )
         booleanParam(
             name: 'CLEAN_BUILD',
-            defaultValue: true,  // CHANGED: Default to true to prevent cache issues
+            defaultValue: true,
             description: 'Clean all caches before build'
         )
         booleanParam(
@@ -219,7 +219,7 @@ pipeline {
                     sh '''
                         set -e
                         mkdir -p android/app
-                        cp $GOOGLE_SERVICES android/app/google-services.json
+                        cp "$GOOGLE_SERVICES" android/app/google-services.json
                         
                         if [ ! -f "android/app/google-services.json" ]; then
                             echo "❌ ERROR: Failed to copy google-services.json"
@@ -231,9 +231,79 @@ pipeline {
                 }
             }
         }
+
+        // ============================================
+        // STAGE 5: SETUP ANDROID SIGNING
+        // ============================================
+        stage('Setup Android Signing') {
+            steps {
+                echo '🔐 Setting up Android signing configuration...'
+                script {
+                    withCredentials([
+                        file(credentialsId: 'android-release-keystore', variable: 'KEYSTORE_FILE'),
+                        string(credentialsId: 'keystore-password', variable: 'STORE_PASSWORD'),
+                        string(credentialsId: 'key-alias', variable: 'KEY_ALIAS'),
+                        string(credentialsId: 'key-password', variable: 'KEY_PASSWORD')
+                    ]) {
+                        sh '''
+                            set -e
+                            
+                            echo "Setting up keystore..."
+                            mkdir -p android/app
+                            
+                            # Copy keystore from Jenkins credentials
+                            cp "$KEYSTORE_FILE" android/app/my-release-key.keystore
+                            chmod 600 android/app/my-release-key.keystore
+                            
+                            # Verify keystore exists and is readable
+                            if [ ! -f "android/app/my-release-key.keystore" ]; then
+                                echo "❌ ERROR: Keystore file not found after copy"
+                                exit 1
+                            fi
+                            
+                            if [ ! -r "android/app/my-release-key.keystore" ]; then
+                                echo "❌ ERROR: Keystore file is not readable"
+                                exit 1
+                            fi
+                            
+                            echo "✅ Keystore copied: android/app/my-release-key.keystore"
+                            
+                            # Create keystore.properties for Gradle
+                            cat > android/keystore.properties << EOF
+MYAPP_UPLOAD_STORE_FILE=my-release-key.keystore
+MYAPP_UPLOAD_KEY_ALIAS=${KEY_ALIAS}
+MYAPP_UPLOAD_STORE_PASSWORD=${STORE_PASSWORD}
+MYAPP_UPLOAD_KEY_PASSWORD=${KEY_PASSWORD}
+EOF
+                            
+                            # Verify properties file was created
+                            if [ ! -f "android/keystore.properties" ]; then
+                                echo "❌ ERROR: Failed to create keystore.properties"
+                                exit 1
+                            fi
+                            
+                            echo "✅ Signing configuration complete"
+                            echo "   ├─ Keystore: android/app/my-release-key.keystore"
+                            echo "   ├─ Properties: android/keystore.properties"
+                            echo "   └─ Key Alias: ${KEY_ALIAS}"
+                            
+                            # Optional: Verify keystore is valid (without exposing passwords)
+                            if command -v keytool >/dev/null 2>&1; then
+                                echo "Verifying keystore validity..."
+                                keytool -list -keystore android/app/my-release-key.keystore \
+                                    -storepass "${STORE_PASSWORD}" \
+                                    -alias "${KEY_ALIAS}" > /dev/null 2>&1 && \
+                                    echo "✅ Keystore validation successful" || \
+                                    echo "⚠️  WARNING: Keystore validation failed - check credentials"
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
         
         // ============================================
-        // NEW STAGE: CLEAR GRADLE CACHE 
+        // STAGE 6: CLEAR GRADLE CACHE 
         // ============================================
         stage('Clear Gradle Cache') {
             when {
@@ -258,7 +328,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 5: INSTALL DEPENDENCIES
+        // STAGE 7: INSTALL DEPENDENCIES
         // ============================================
         stage('Install Dependencies') {
             steps {
@@ -297,7 +367,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 6: SECURITY SCANNING
+        // STAGE 8: SECURITY SCANNING
         // ============================================
         stage('Security Scanning') {
             steps {
@@ -322,7 +392,6 @@ pipeline {
                     
                     if [ "$CRITICAL" -gt 0 ]; then
                         echo "⚠️  WARNING: Found $CRITICAL critical vulnerabilities"
-                        # CHANGED: Don't fail build, just warn
                     fi
                     
                     if [ "$HIGH" -gt 5 ]; then
@@ -340,7 +409,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 7: CODE QUALITY
+        // STAGE 9: CODE QUALITY
         // ============================================
         stage('Code Quality') {
             steps {
@@ -379,7 +448,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 8: UNIT TESTS
+        // STAGE 10: UNIT TESTS
         // ============================================
         stage('Unit Tests') {
             steps {
@@ -427,7 +496,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 9: CLEAN ANDROID BUILD 
+        // STAGE 11: CLEAN ANDROID BUILD 
         // ============================================
         stage('Clean Android') {
             steps {
@@ -440,14 +509,14 @@ pipeline {
                     chmod +x gradlew
                     ./gradlew --stop 2>/dev/null || true
                     
-                    # ENHANCED: Remove build artifacts and CMake cache
+                    # Remove build artifacts and CMake cache
                     echo "Removing local build artifacts..."
                     rm -rf .gradle/
                     rm -rf app/.cxx/
                     rm -rf app/build/
                     rm -rf build/
                     
-                    # CRITICAL FIX: Set proper Java options
+                    # Set proper Java options
                     export GRADLE_OPTS="-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
                     
                     # Run clean without daemon and with more verbose output
@@ -464,7 +533,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 10: BUILD RELEASE APK 
+        // STAGE 12: BUILD RELEASE APK 
         // ============================================
         stage('Build Release APK') {
             steps {
@@ -476,7 +545,7 @@ pipeline {
                     
                     echo "Building release APK..."
                     
-                    # CRITICAL: Set memory and encoding
+                    # Set memory and encoding
                     export GRADLE_OPTS="-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
                     
                     # Build with retry on CMake errors
@@ -511,7 +580,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 11: BUILD DEBUG APK 
+        // STAGE 13: BUILD DEBUG APK 
         // ============================================
         stage('Build Debug APK') {
             steps {
@@ -553,7 +622,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 12: APK ANALYSIS
+        // STAGE 14: APK ANALYSIS
         // ============================================
         stage('APK Analysis') {
             steps {
@@ -581,7 +650,7 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 13: ARCHIVE & BUILD INFO
+        // STAGE 15: ARCHIVE & BUILD INFO
         // ============================================
         stage('Archive APKs') {
             steps {
@@ -669,14 +738,29 @@ EOF
                 echo "═══════════════════════════════════════════════════"
             }
             
-            // Clean sensitive files
+            // Clean sensitive files - ENHANCED
             sh '''
                 echo "🧹 Cleaning sensitive files..."
+                
+                # Remove Firebase config
                 rm -f android/app/google-services.json
-                rm -f android/app/release.keystore
+                
+                # Remove keystore files
+                rm -f android/app/my-release-key.keystore
                 rm -f android/keystore.properties
-                find . -name "*.keystore" -delete 2>/dev/null || true
-                find . -name "*.jks" -delete 2>/dev/null || true
+                
+                # Remove any other keystore files
+                find . -name "*.keystore" -type f -delete 2>/dev/null || true
+                find . -name "*.jks" -type f -delete 2>/dev/null || true
+                
+                # Verify sensitive files are removed
+                if [ -f "android/keystore.properties" ] || [ -f "android/app/my-release-key.keystore" ]; then
+                    echo "⚠️  WARNING: Some sensitive files still exist"
+                    ls -la android/keystore.properties android/app/my-release-key.keystore 2>/dev/null || true
+                else
+                    echo "✅ All sensitive files removed"
+                fi
+                
                 echo "✅ Cleanup completed"
             '''
             
@@ -686,7 +770,8 @@ EOF
                 patterns: [
                     [pattern: 'node_modules', type: 'INCLUDE'],
                     [pattern: 'android/build', type: 'INCLUDE'],
-                    [pattern: 'android/app/build', type: 'INCLUDE']
+                    [pattern: 'android/app/build', type: 'INCLUDE'],
+                    [pattern: 'android/.gradle', type: 'INCLUDE']
                 ]
             )
         }
@@ -704,6 +789,8 @@ EOF
                 echo ""
                 echo "📄 Build Info: ${BUILD_URL}artifact/build-info.txt"
                 echo "⏱️  Duration: ${durationMinutes} minutes"
+                echo ""
+                echo "🔒 Security: Keystore and credentials cleaned from workspace"
             }
         }
         
@@ -712,9 +799,16 @@ EOF
             echo "Check console output: ${BUILD_URL}console"
             echo ""
             echo "Common fixes:"
-            echo "1. Re-run build with 'CLEAR_GRADLE_CACHE' enabled"
-            echo "2. Check ESLint errors in the logs"
-            echo "3. Verify google-services.json credential is configured"
+            echo "1. Verify Jenkins credentials are configured:"
+            echo "   - android-release-keystore (File)"
+            echo "   - keystore-password (Secret text)"
+            echo "   - key-alias (Secret text)"
+            echo "   - key-password (Secret text)"
+            echo "   - google-services-json (File)"
+            echo ""
+            echo "2. Re-run build with 'CLEAR_GRADLE_CACHE' enabled"
+            echo "3. Check if keystore passwords match the actual keystore"
+            echo "4. Verify google-services.json is valid for your Firebase project"
         }
         
         unstable {
