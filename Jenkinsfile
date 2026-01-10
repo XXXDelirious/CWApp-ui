@@ -86,7 +86,7 @@ pipeline {
                     
                     // Create audit log
                     def auditLog = [
-                        timestamp = new Date().format("yyyy-MM-dd'T'HH:mm:ss"),
+                        timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss"),
                         build_number: BUILD_NUMBER,
                         commit: env.GIT_COMMIT_SHORT,
                         branch: env.GIT_BRANCH,
