@@ -436,40 +436,27 @@ pipeline {
                 sh '''
                     set -e
                     cd android
-                    
                     chmod +x gradlew
                     
-                    # Build release APK - standalone, no Metro needed
                     echo "Building release APK..."
-                    ./gradlew assembleRelease \
-                        --no-daemon \
-                        --stacktrace \
-                        -Dorg.gradle.jvmargs="-Xmx4096m" \
-                        2>&1 | tee ../gradle-release.log
                     
+                    # Set GRADLE_OPTS to override any problematic settings
+                    export GRADLE_OPTS="-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+                    
+                    # Build release APK
+                    ./gradlew assembleRelease --no-daemon --stacktrace | tee ../gradle-release.log
+                    
+                    # Verify APK was created
                     RELEASE_APK="app/build/outputs/apk/release/app-release.apk"
-                    
-                    # Verify APK exists
                     if [ ! -f "$RELEASE_APK" ]; then
-                        echo "❌ ERROR: Release APK not found"
+                        echo "❌ ERROR: Release APK not found at $RELEASE_APK"
                         exit 1
                     fi
                     
                     # Get APK info
-                    APK_SIZE=$(ls -lh "$RELEASE_APK" | awk '{print $5}')
-                    APK_SIZE_MB=$(du -m "$RELEASE_APK" | cut -f1)
-                    
-                    echo "✅ Release APK built successfully!"
-                    echo "   Location: android/$RELEASE_APK"
-                    echo "   Size: $APK_SIZE (${APK_SIZE_MB}MB)"
-                    
-                    # Check size warning
-                    if [ "$APK_SIZE_MB" -gt "$MAX_APK_SIZE_MB" ]; then
-                        echo "⚠️  WARNING: APK size (${APK_SIZE_MB}MB) exceeds ${MAX_APK_SIZE_MB}MB"
-                    fi
-                    
-                    # Copy to workspace
-                    cp "$RELEASE_APK" "../app-release.apk"
+                    APK_SIZE=$(du -h "$RELEASE_APK" | cut -f1)
+                    echo "✅ Release APK built successfully: $APK_SIZE"
+                    echo "   Location: $RELEASE_APK"
                 '''
             }
             post {
@@ -488,34 +475,27 @@ pipeline {
                 sh '''
                     set -e
                     cd android
-                    
                     chmod +x gradlew
                     
-                    # Build debug APK - requires Metro bundler
                     echo "Building debug APK..."
-                    ./gradlew assembleDebug \
-                        --no-daemon \
-                        --stacktrace \
-                        -Dorg.gradle.jvmargs="-Xmx4096m" \
-                        2>&1 | tee ../gradle-debug.log
                     
+                    # Set GRADLE_OPTS to override any problematic settings
+                    export GRADLE_OPTS="-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+                    
+                    # Build debug APK
+                    ./gradlew assembleDebug --no-daemon | tee ../gradle-debug.log
+                    
+                    # Verify APK was created
                     DEBUG_APK="app/build/outputs/apk/debug/app-debug.apk"
-                    
-                    # Verify APK exists
                     if [ ! -f "$DEBUG_APK" ]; then
-                        echo "❌ ERROR: Debug APK not found"
+                        echo "❌ ERROR: Debug APK not found at $DEBUG_APK"
                         exit 1
                     fi
                     
                     # Get APK info
-                    APK_SIZE=$(ls -lh "$DEBUG_APK" | awk '{print $5}')
-                    
-                    echo "✅ Debug APK built successfully!"
-                    echo "   Location: android/$DEBUG_APK"
-                    echo "   Size: $APK_SIZE"
-                    
-                    # Copy to workspace
-                    cp "$DEBUG_APK" "../app-debug.apk"
+                    APK_SIZE=$(du -h "$DEBUG_APK" | cut -f1)
+                    echo "✅ Debug APK built successfully: $APK_SIZE"
+                    echo "   Location: $DEBUG_APK"
                 '''
             }
             post {
