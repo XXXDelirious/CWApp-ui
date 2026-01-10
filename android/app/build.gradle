@@ -9,6 +9,8 @@ react {
     autolinkLibrariesWithApp()
 }
 
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
 def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
@@ -17,6 +19,10 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
+
+    project.ext.react = [
+            enableHermes: true,  // Set this to true
+    ]
 
     defaultConfig {
         applicationId "com.alphaaid.cwapp"
@@ -34,31 +40,23 @@ android {
             keyPassword 'android'
         }
         release {
-            
-            def keystorePath = System.getenv("KEYSTORE_FILE") ?: project.findProperty("KEYSTORE_FILE")
-            if (keystorePath) {
-                storeFile file(keystorePath)
-                storePassword System.getenv("KEYSTORE_PASSWORD") ?: project.findProperty("KEYSTORE_PASSWORD")
-                keyAlias System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS")
-                keyPassword System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD")
-            } else {
-                
-                storeFile file('debug.keystore')
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
+            if (project.hasProperty('MYAPP_RELEASE_STORE_FILE')) {
+                storeFile file(MYAPP_RELEASE_STORE_FILE)
+                storePassword MYAPP_RELEASE_STORE_PASSWORD
+                keyAlias MYAPP_RELEASE_KEY_ALIAS
+                keyPassword MYAPP_RELEASE_KEY_PASSWORD
             }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug 
+            signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.release 
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+            minifyEnabled true // Enables Proguard (shrinks code)
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
 

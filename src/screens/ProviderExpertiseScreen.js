@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import log from '../../utils/logger';
+
 import {
   View,
   Text,
@@ -13,11 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 const expertiseOptions = [
-  { id: '1', name: 'Medical Professionals' },
-  { id: '2', name: 'Wellness Support' },
-  { id: '3', name: 'Home Care and Daily Massage' },
-  { id: '4', name: 'Counselors' },
-  { id: '5', name: 'Fitness Instructors' },
+  { id: '1', key: 'medicalProfessionals' },
+  { id: '2', key: 'wellnessSupport' },
+  { id: '3', key: 'homeCare' },
+  { id: '4', key: 'counselors' },
+  { id: '5', key: 'fitnessInstructors' },
 ];
 
 export default function ProviderExpertiseScreen({ navigation, route }) {
@@ -68,12 +70,7 @@ export default function ProviderExpertiseScreen({ navigation, route }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Title */}
-        <Text style={styles.title}>{t('selectYourExpertise') || 'What is Your Expertise?'}</Text>
-
-        {/* Subtitle */}
-        <Text style={styles.subtitle}>
-          {t('selectYourExpertiseSubtitle') || 'Please select your field your expertise'}
-        </Text>
+        <Text style={styles.title}>{t('selectYourExpertiseSubtitle') || 'Select your expertise'}</Text>
 
         {/* Divider */}
         <View style={styles.divider} />
@@ -98,7 +95,8 @@ export default function ProviderExpertiseScreen({ navigation, route }) {
                     isSelected && styles.optionTextSelected,
                   ]}
                 >
-                  {option.name}
+                  {/* USE THE TRANSLATION FUNCTION HERE */}
+                  {t(option.key)}
                 </Text>
               </TouchableOpacity>
             );

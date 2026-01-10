@@ -51,6 +51,10 @@
   "error": "Error",
   "missingConfirmation": "Missing confirmation object.",
   "searchServiceProduct": "What 'Service/Product' do you need?",
-  "selectYourExpertise": "What is Your Expertise?",
-  "selectYourExpertiseSubtitle": "Please select your field of expertise"
+  "selectYourExpertise": "Choose your expertise",
+  "selectYourExpertiseSubtitle": "Please select your field of expertise",
+  "medicalProfessionals": "Medical Professionals",
+  "wellnessSupport": "Wellness Support",
+  "homeCare": "Home Care and Daily Massage",
+  "fitnessInstructors": "Fitness Instructors"
 }
