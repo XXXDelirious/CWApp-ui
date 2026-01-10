@@ -412,18 +412,16 @@ pipeline {
                     set -e
                     cd android
                     
-                    # Fix gradle.properties for Java 17+ compatibility
-                    if [ -f gradle.properties ]; then
-                        echo "Fixing gradle.properties for Java 17+ compatibility..."
-                        # Backup original
-                        cp gradle.properties gradle.properties.bak
-                        # Remove MaxPermSize which is not supported in Java 8+
-                        sed -i 's/-XX:MaxPermSize=[^ ]*//g' gradle.properties
-                        sed -i 's/  */ /g' gradle.properties  # Clean up extra spaces
-                    fi
-                    
+                    # Stop any existing Gradle daemons
                     chmod +x gradlew
+                    ./gradlew --stop 2>/dev/null || true
+                    
+                    # Set Java options that override gradle.properties
+                    export GRADLE_OPTS="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8"
+                    
+                    # Run clean without daemon
                     ./gradlew clean --no-daemon
+                    
                     echo "✅ Android build cleaned"
                 '''
             }
