@@ -2,18 +2,16 @@ pipeline {
     agent any
     
     // ============================================
-    // CWAPP DEV PIPELINE - SECURE & PRACTICAL
-    // Fixed to handle Gradle cache issues
+    // CWAPP DEV PIPELINE 
     // ============================================
     
     environment {
         // App Configuration
         APP_NAME = 'CWApp'
         
-        // Your Android SDK Configuration (KEEP AS-IS)
         ANDROID_HOME = '/var/lib/jenkins/Android/Sdk'
         ANDROID_SDK_ROOT = '/var/lib/jenkins/Android/Sdk'
-        PATH = "$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools"
+        PATH = "$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/36.0.2"
         
         // Node.js
         NODE_VERSION = '18.x'
@@ -21,8 +19,7 @@ pipeline {
         // Build Configuration
         MAX_APK_SIZE_MB = '150'
         MIN_TEST_COVERAGE = '70'
-        
-        // Gradle (prevent OOM errors) - INCREASED MEMORY
+    
         GRADLE_OPTS = '-Xmx4096m -XX:MaxPermSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8'
     }
     
@@ -236,7 +233,7 @@ pipeline {
         }
         
         // ============================================
-        // NEW STAGE: CLEAR GRADLE CACHE (IF NEEDED)
+        // NEW STAGE: CLEAR GRADLE CACHE 
         // ============================================
         stage('Clear Gradle Cache') {
             when {
@@ -430,11 +427,11 @@ pipeline {
         }
         
         // ============================================
-        // STAGE 9: CLEAN ANDROID BUILD
+        // STAGE 9: CLEAN ANDROID BUILD 
         // ============================================
         stage('Clean Android') {
             steps {
-                echo '🧹 Cleaning Android build ...'
+                echo '🧹 Cleaning Android build (enhanced)...'
                 sh '''
                     set -e
                     cd android
@@ -696,7 +693,8 @@ EOF
         
         success {
             script {
-                def duration = currentBuild.duration / 1000 / 60
+                def durationSeconds = currentBuild.duration / 1000
+                def durationMinutes = Math.round(durationSeconds / 60 * 10) / 10
                 
                 echo "✅ BUILD SUCCESSFUL!"
                 echo ""
@@ -705,7 +703,7 @@ EOF
                 echo "   🔴 Debug APK:   ${BUILD_URL}artifact/app-debug.apk"
                 echo ""
                 echo "📄 Build Info: ${BUILD_URL}artifact/build-info.txt"
-                echo "⏱️  Duration: ${duration.round(1)} minutes"
+                echo "⏱️  Duration: ${durationMinutes} minutes"
             }
         }
         
