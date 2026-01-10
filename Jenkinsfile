@@ -286,27 +286,31 @@ pipeline {
                 sh '''
                     set -e
                     
-                    # Run npm audit
                     echo "Running npm audit..."
                     npm audit --audit-level=high --json > npm-audit.json || true
                     
-                    # Check for vulnerabilities
+                    # Extract vulnerability counts safely
                     CRITICAL=$(cat npm-audit.json | grep -o '"critical":[0-9]*' | grep -o '[0-9]*' || echo "0")
                     HIGH=$(cat npm-audit.json | grep -o '"high":[0-9]*' | grep -o '[0-9]*' || echo "0")
+                    
+                    # Default to 0 if empty
+                    CRITICAL=${CRITICAL:-0}
+                    HIGH=${HIGH:-0}
                     
                     echo "Security scan results:"
                     echo "  Critical: $CRITICAL"
                     echo "  High: $HIGH"
                     
-                    # Warning on critical (don't fail dev builds)
+                    # Check thresholds
                     if [ "$CRITICAL" -gt 0 ]; then
-                        echo "⚠️  WARNING: $CRITICAL critical vulnerabilities found!"
-                        echo "Review npm-audit.json and fix before production"
-                        # npm audit --audit-level=critical
+                        echo "❌ ERROR: Found $CRITICAL critical vulnerabilities"
+                        echo "Please fix critical vulnerabilities before deploying"
+                        exit 1
                     fi
                     
                     if [ "$HIGH" -gt 5 ]; then
-                        echo "⚠️  WARNING: $HIGH high-severity vulnerabilities"
+                        echo "⚠️  WARNING: Found $HIGH high severity vulnerabilities (threshold: 5)"
+                        echo "Consider addressing these before production deployment"
                     fi
                     
                     echo "✅ Security scan completed"
@@ -318,7 +322,6 @@ pipeline {
                 }
             }
         }
-        
         // ============================================
         // STAGE 7: CODE QUALITY
         // ============================================
