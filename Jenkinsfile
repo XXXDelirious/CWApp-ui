@@ -107,41 +107,46 @@ pipeline {
                 sh '''
                     set -e
                     echo "==================================="
+                    echo "   ENVIRONMENT VERIFICATION"
+                    echo "==================================="
                     
                     # Check Node.js
-                    if ! command -v node &> /dev/null; then
+                    if ! command -v node >/dev/null 2>&1; then
                         echo "❌ ERROR: Node.js not installed"
                         exit 1
                     fi
                     echo "✅ Node.js: $(node --version)"
                     
                     # Check npm
-                    if ! command -v npm &> /dev/null; then
+                    if ! command -v npm >/dev/null 2>&1; then
                         echo "❌ ERROR: npm not installed"
                         exit 1
                     fi
                     echo "✅ npm: $(npm --version)"
                     
                     # Check Java
-                    if ! command -v java &> /dev/null; then
+                    if ! command -v java >/dev/null 2>&1; then
                         echo "❌ ERROR: Java not installed"
                         exit 1
                     fi
-                    echo "✅ Java: $(java -version 2>&1 | head -n 1)"
+                    JAVA_VERSION=$(java -version 2>&1 | head -n 1)
+                    echo "✅ Java: $JAVA_VERSION"
                     
                     # Verify Android SDK
-                    if [ ! -d "$ANDROID_HOME" ]; then
-                        echo "❌ ERROR: Android SDK not found at: $ANDROID_HOME"
+                    if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME" ]; then
+                        echo "❌ ERROR: ANDROID_HOME not set or directory not found"
+                        echo "   ANDROID_HOME: ${ANDROID_HOME:-<not set>}"
                         exit 1
                     fi
                     echo "✅ Android SDK: $ANDROID_HOME"
                     
                     # Check ADB
-                    if ! command -v adb &> /dev/null; then
+                    if ! command -v adb >/dev/null 2>&1; then
                         echo "❌ ERROR: ADB not found in PATH"
                         exit 1
                     fi
-                    echo "✅ ADB: $(adb --version | head -n 1)"
+                    ADB_VERSION=$(adb --version 2>&1 | head -n 1)
+                    echo "✅ ADB: $ADB_VERSION"
                     
                     # Check disk space
                     DISK_USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
@@ -151,12 +156,18 @@ pipeline {
                     fi
                     
                     # Check memory
-                    FREE_MEM=$(free -m | grep Mem | awk '{print $7}')
-                    echo "✅ Free memory: ${FREE_MEM}MB"
-                    if [ "$FREE_MEM" -lt 2048 ]; then
-                        echo "⚠️  WARNING: Low memory (< 2GB)"
+                    if command -v free >/dev/null 2>&1; then
+                        FREE_MEM=$(free -m | grep Mem | awk '{print $7}')
+                        echo "✅ Free memory: ${FREE_MEM}MB"
+                        if [ "$FREE_MEM" -lt 2048 ]; then
+                            echo "⚠️  WARNING: Low memory (< 2GB available)"
+                        fi
+                    else
+                        echo "ℹ️  Memory check skipped (free command not available)"
                     fi
                     
+                    echo "==================================="
+                    echo "✅ Environment verification complete"
                     echo "==================================="
                 '''
             }
