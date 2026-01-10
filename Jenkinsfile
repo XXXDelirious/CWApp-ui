@@ -242,7 +242,7 @@ pipeline {
                     withCredentials([
                         file(credentialsId: 'android-release-keystore', variable: 'KEYSTORE_FILE'),
                         string(credentialsId: 'keystore-password', variable: 'STORE_PASSWORD'),
-                        string(credentialsId: 'key-alias', variable: 'KEY_ALIAS'),
+                        string(credentialsId: 'my-key-alias', variable: 'KEY_ALIAS'),
                         string(credentialsId: 'key-password', variable: 'KEY_PASSWORD')
                     ]) {
                         sh '''
