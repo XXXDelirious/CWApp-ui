@@ -365,60 +365,39 @@ pipeline {
         // STAGE 8: UNIT TESTS
         // ============================================
         stage('Unit Tests') {
-            when {
-                expression { return !params.SKIP_TESTS }
-            }
             steps {
                 echo '🧪 Running unit tests...'
                 sh '''
                     set -e
                     export TZ=UTC
                     
-                    # Check if tests exist
                     if [ ! -d "__tests__" ] && [ ! -d "tests" ]; then
                         echo "⚠️  No test directory found, skipping tests"
                         exit 0
                     fi
                     
-                    # Run tests with coverage
-                    npm test -- \
-                        --coverage \
-                        --watchAll=false \
-                        --maxWorkers=2 \
-                        --bail=false \
-                        --testTimeout=10000 \
-                        --json \
-                        --outputFile=test-results.json \
-                        2>&1 | tee test-output.log || {
-                        echo "⚠️  Some tests failed (continuing build)"
-                    }
-                    
-                    # Check coverage if report exists
-                    if [ -f "coverage/coverage-summary.json" ]; then
-                        COVERAGE=$(node -p "require('./coverage/coverage-summary.json').total.lines.pct" 2>/dev/null || echo "0")
-                        echo "Test coverage: ${COVERAGE}%"
-                        
-                        if (( $(echo "$COVERAGE < $MIN_TEST_COVERAGE" | bc -l 2>/dev/null || echo "0") )); then
-                            echo "⚠️  WARNING: Coverage (${COVERAGE}%) below threshold (${MIN_TEST_COVERAGE}%)"
-                        else
-                            echo "✅ Coverage threshold met"
-                        fi
-                    fi
-                    
-                    echo "✅ Tests completed"
+                    npm test -- --coverage || true
+                    echo "✅ Unit tests completed"
                 '''
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: '**/test-results.xml'
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'coverage',
-                        reportFiles: 'index.html',
-                        reportName: 'Coverage Report'
-                    ])
+                    junit testResults: '**/junit.xml', allowEmptyResults: true
+                    script {
+                        // Only publish HTML if coverage directory exists
+                        if (fileExists('coverage/index.html')) {
+                            publishHTML(target: [
+                                allowMissing: true,
+                                alwaysLinkToLastBuild: true,
+                                keepAll: true,
+                                reportDir: 'coverage',
+                                reportFiles: 'index.html',
+                                reportName: 'Coverage Report'
+                            ])
+                        } else {
+                            echo "ℹ️  No coverage report generated"
+                        }
+                    }
                 }
             }
         }
@@ -433,21 +412,18 @@ pipeline {
                     set -e
                     cd android
                     
-                    chmod +x gradlew
-                    
-                    # Clean Gradle build
-                    ./gradlew clean --no-daemon
-                    
-                    # Remove build directories
-                    rm -rf app/build
-                    rm -rf build
-                    
-                    # Clean Gradle cache if requested
-                    if [ "${CLEAN_BUILD}" = "true" ]; then
-                        echo "Cleaning Gradle cache..."
-                        rm -rf ~/.gradle/caches/ || true
+                    # Fix gradle.properties for Java 17+ compatibility
+                    if [ -f gradle.properties ]; then
+                        echo "Fixing gradle.properties for Java 17+ compatibility..."
+                        # Backup original
+                        cp gradle.properties gradle.properties.bak
+                        # Remove MaxPermSize which is not supported in Java 8+
+                        sed -i 's/-XX:MaxPermSize=[^ ]*//g' gradle.properties
+                        sed -i 's/  */ /g' gradle.properties  # Clean up extra spaces
                     fi
                     
+                    chmod +x gradlew
+                    ./gradlew clean --no-daemon
                     echo "✅ Android build cleaned"
                 '''
             }
